@@ -741,7 +741,7 @@ class Subsystem:
             state
             for state, information in state_to_information.items()
             if information == max_information
-        ]
+        ], max_information
 
     # Phi_max methods
     # =========================================================================
@@ -817,7 +817,7 @@ class Subsystem:
                 # `all_mips` and taking max is correct
                 all_mips = []
                 for purview in purviews:
-                    maximal_states = self.find_maximal_state_under_complete_partition(
+                    maximal_states, _ = self.find_maximal_state_under_complete_partition(
                         direction, mechanism, purview
                     )
                     mips = [
@@ -828,12 +828,38 @@ class Subsystem:
                     for mip in mips:
                         mip.set_specified_state(maximal_states)
                     all_mips.extend(mips)
+            elif config.IIT_VERSION == "min-max-max":
+                all_purviews = []
+                for purview in purviews:
+                    maximal_states, information = self.find_maximal_state_under_complete_partition(
+                        direction, mechanism, purview
+                    )
+                    all_purviews += [{'purview': purview, 'maximal_states': maximal_states, 'information':  information }]
+                    
+                max_information = max(p['information'] for p in all_purviews)
+                max_purviews = [p for p in all_purviews if p['information']==max_information]
+                all_mips = []
+                for purview in max_purviews:     
+                    mips = [
+                        self.find_mip(direction, mechanism, purview['purview'], state=state)
+                        for state in purview['maximal_states']
+                    ]
+                    maximal_states = np.array(purview['maximal_states'])
+                    
+                    for mip in mips:
+                        mip.set_specified_state(maximal_states)
+                    all_mips.extend(mips)
             else:
                 all_mips = [
                     self.find_mip(direction, mechanism, purview) for purview in purviews
                 ]
-            max_mip = max(all_mips)
-            ties = tuple(mice_class(mip) for mip in all_mips if mip.phi == max_mip.phi)
+            
+            if config.IIT_VERSION == "min-max-max":
+                max_mip = min(all_mips)
+                ties = tuple(mice_class(mip) for mip in all_mips if mip.phi == max_mip.phi)
+            else:
+                max_mip = max(all_mips)
+                ties = tuple(mice_class(mip) for mip in all_mips if mip.phi == max_mip.phi)
 
         for tie in ties:
             tie.set_ties(ties)
